@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FastAPI RAG Assistant</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --container-bg: #1e293b;
+            --accent-primary: #38bdf8;
+            --accent-secondary: #818cf8;
+            --text-main: #f8fafc;
+            --text-dim: #94a3b8;
+            --bot-bubble: #334155;
+            --user-bubble: #0ea5e9;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            background: var(--bg-color);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 800px;
+            height: 85vh;
+            background: var(--container-bg);
+            border-radius: 24px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .header {
+            padding: 24px;
+            background: rgba(255, 255, 255, 0.03);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            background: linear-gradient(to right, var(--accent-primary), var(--accent-secondary));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .upload-section {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .upload-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px dashed var(--text-dim);
+            padding: 8px 16px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        .upload-btn:hover {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+        }
+
+        #file-input { display: none; }
+
+        .chat-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            scrollbar-width: thin;
+            scrollbar-color: var(--accent-primary) transparent;
+        }
+
+        .chat-area::-webkit-scrollbar { width: 6px; }
+        .chat-area::-webkit-scrollbar-thumb { background: var(--accent-primary); border-radius: 10px; }
+
+        .message {
+            max-width: 85%;
+            padding: 14px 18px;
+            border-radius: 18px;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .bot-message {
+            align-self: flex-start;
+            background: var(--bot-bubble);
+            border-bottom-left-radius: 4px;
+        }
+
+        .user-message {
+            align-self: flex-end;
+            background: var(--user-bubble);
+            border-bottom-right-radius: 4px;
+            color: white;
+        }
+
+        .input-area {
+            padding: 24px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            gap: 12px;
+        }
+
+        #query-input {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            padding: 14px 18px;
+            color: white;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        #query-input:focus { border-color: var(--accent-primary); }
+
+        .send-btn {
+            background: var(--accent-primary);
+            border: none;
+            border-radius: 14px;
+            padding: 0 24px;
+            color: var(--bg-color);
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        .send-btn:active { transform: scale(0.95); }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #22c55e;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 6px;
+            box-shadow: 0 0 8px #22c55e;
+        }
+
+        .meta {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            margin-top: 6px;
+            display: block;
+        }
+
+        /* --- New Styling for Source Attribution --- */
+        .sources-container {
+            margin-top: 14px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 0.85rem;
+            color: var(--text-dim);
+        }
+
+        .source-title {
+            font-weight: 600;
+            color: var(--accent-primary);
+            margin-bottom: 6px;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .source-item {
+            background: rgba(255, 255, 255, 0.03);
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            border-left: 2px solid var(--accent-secondary);
+            margin-left: 10px;
+        }
+
+        .source-filename {
+            font-weight: 600;
+            color: white;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .source-snippet {
+            font-style: italic;
+            display: block;
+            line-height: 1.4;
+        }
+
+        /* --- New Styling for Loading Indicator --- */
+        .loading {
+            display: none; /* Hidden by default */
+            padding: 12px 24px;
+            font-size: 0.9rem;
+            color: var(--accent-primary);
+            font-weight: 600;
+            align-items: center;
+            gap: 8px;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+        }
+
+        .dots::after {
+            content: '.';
+            animation: dots 1.5s steps(5, end) infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60% { content: '...'; }
+            80%, 100% { content: ''; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1>RAG Intelligence</h1>
+                <span style="font-size: 0.8rem; color: var(--text-dim)">
+                    <span class="status-dot"></span> System Online
+                </span>
+            </div>
+            <div class="upload-section">
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <label for="file-input" class="upload-btn" id="upload-label">Upload Doc (.pdf, .docx)</label>
+                    <div style="display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: var(--text-dim); margin-left: 4px;">
+                        <input type="checkbox" id="reset-on-upload" style="cursor: pointer;">
+                        <label for="reset-on-upload" style="cursor: pointer;">Clear session on upload</label>
+                    </div>
+                </div>
+                <input type="file" id="file-input" accept=".pdf,.docx" multiple>
+                <button class="upload-btn" id="reset-btn" style="border-style: solid; border-color: #ef4444; color: #ef4444; height: fit-content; align-self: flex-start;">Reset Session</button>
+            </div>
+        </div>
+
+        <div class="chat-area" id="chat-area">
+            <div class="message bot-message">
+                Hello! I am your RAG-powered assistant. Upload a document and ask me anything about it.
+            </div>
+        </div>
+
+        <div id="loading" class="loading">Thinking<span class="dots"></span></div>
+
+        <div class="input-area">
+            <input type="text" id="query-input" placeholder="Type your question here..." autocomplete="off">
+            <button class="send-btn" id="send-btn">Ask</button>
+        </div>
+    </div>
+
+    <script>
+        const chatArea = document.getElementById('chat-area');
+        const queryInput = document.getElementById('query-input');
+        const sendBtn = document.getElementById('send-btn');
+        const fileInput = document.getElementById('file-input');
+        const uploadLabel = document.getElementById('upload-label');
+        const resetBtn = document.getElementById('reset-btn');
+        const resetOnUpload = document.getElementById('reset-on-upload');
+        const loadingIndicator = document.getElementById('loading');
+
+        /**
+         * Appends a message to the chat area with optional sources and meta information.
+         */
+        function appendMessage(role, content, meta = null, sources = []) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${role}-message`;
+            
+            // Core response text
+            const textContent = document.createElement('div');
+            textContent.innerText = content;
+            msgDiv.appendChild(textContent);
+            
+            // Source attribution (if any)
+            if (sources && sources.length > 0) {
+                const sourcesDiv = document.createElement('div');
+                sourcesDiv.className = 'sources-container';
+                
+                const title = document.createElement('div');
+                title.className = 'source-title';
+                title.innerText = 'Sources:';
+                sourcesDiv.appendChild(title);
+                
+                sources.forEach(src => {
+                    const item = document.createElement('div');
+                    item.className = 'source-item';
+                    
+                    const filename = document.createElement('span');
+                    filename.className = 'source-filename';
+                    filename.innerText = src.filename;
+                    
+                    const snippet = document.createElement('span');
+                    snippet.className = 'source-snippet';
+                    snippet.innerText = `"${src.snippet}"`;
+                    
+                    item.appendChild(filename);
+                    item.appendChild(snippet);
+                    sourcesDiv.appendChild(item);
+                });
+                
+                msgDiv.appendChild(sourcesDiv);
+            }
+            
+            // Meta info (relevant chunks count, timestamp, etc)
+            if (meta) {
+                const metaSpan = document.createElement('span');
+                metaSpan.className = 'meta';
+                metaSpan.innerText = meta;
+                msgDiv.appendChild(metaSpan);
+            }
+            
+            chatArea.appendChild(msgDiv);
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+
+        /**
+         * UI Helper to show/hide the "Thinking" state and lock user input.
+         */
+        function toggleLoading(isLoading) {
+            loadingIndicator.style.display = isLoading ? 'flex' : 'none';
+            queryInput.disabled = isLoading;
+            sendBtn.disabled = isLoading;
+            if (isLoading) {
+                chatArea.scrollTop = chatArea.scrollHeight;
+            } else {
+                queryInput.focus();
+            }
+        }
+
+        async function handleUpload(e) {
+            const files = Array.from(e.target.files);
+            if (!files.length) return;
+
+            uploadLabel.innerText = "Processing...";
+            const resetParam = resetOnUpload.checked ? "?reset=true" : "";
+
+            for (const file of files) {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                try {
+                    const response = await fetch(`/api/v1/upload${resetParam}`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        if (resetOnUpload.checked) {
+                            chatArea.innerHTML = `
+                                <div class="message bot-message">
+                                    Session reset. Processing new files...
+                                </div>
+                            `;
+                            // Only reset on first file if multiple selected
+                            // We don't want to reset between files in the same batch
+                            resetOnUpload.checked = false; 
+                        }
+                        appendMessage('bot', `File "${file.name}" indexed successfully!`, `Extracted ${data.extracted_text_length} chars into ${data.num_chunks} chunks.`);
+                    } else {
+                        alert(`Error with "${file.name}": ${data.detail}`);
+                    }
+                } catch (err) {
+                    console.error(err);
+                    alert(`Upload failed for "${file.name}".`);
+                }
+            }
+            
+            uploadLabel.innerText = "Upload Doc (.pdf, .docx)";
+            fileInput.value = ''; // Clear for next selection
+        }
+
+        async function handleReset() {
+            if (!confirm("Are you sure you want to reset the session? This will delete all uploaded documents and indexed data.")) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/v1/reset', { method: 'POST' });
+                if (response.ok) {
+                    // Clear the chat UI
+                    chatArea.innerHTML = `
+                        <div class="message bot-message">
+                            Session reset successfully. Upload a new document to begin.
+                        </div>
+                    `;
+                    uploadLabel.innerText = "Upload Doc (.pdf, .docx)";
+                    fileInput.value = ''; // Clear file input
+                } else {
+                    const data = await response.json();
+                    alert(`Reset failed: ${data.detail}`);
+                }
+            } catch (err) {
+                alert("Reset failed. Check connection.");
+                console.error(err);
+            }
+        }
+
+        async function handleQuery() {
+            const query = queryInput.value.trim();
+            if (!query) return;
+
+            appendMessage('user', query);
+            queryInput.value = '';
+            
+            // Show loading and disable inputs
+            toggleLoading(true);
+
+            try {
+                const response = await fetch('/api/v1/query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: query, top_k: 5 })
+                });
+                const data = await response.json();
+
+                // Hide loading and re-enable inputs
+                toggleLoading(false);
+
+                if (response.ok) {
+                    appendMessage('bot', data.answer, `Context used: ${data.num_chunks_used} relevant chunks.`, data.sources);
+                } else {
+                    appendMessage('bot', `Error: ${data.detail || "Something went wrong"}`);
+                }
+            } catch (err) {
+                toggleLoading(false);
+                appendMessage('bot', "Connection failed. Please check your backend.");
+                console.error(err);
+            }
+        }
+
+        fileInput.addEventListener('change', handleUpload);
+        resetBtn.addEventListener('click', handleReset);
+        sendBtn.addEventListener('click', handleQuery);
+        queryInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleQuery();
+        });
+    </script>
+</body>
+</html>
