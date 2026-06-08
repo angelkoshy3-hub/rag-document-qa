@@ -1,0 +1,111 @@
+# ==============================================================================
+# Kubernetes Manifest for FastAPI RAG Application
+# ==============================================================================
+# This single manifest contains three resources separated by "---":
+#   1. Kubernetes Secret (to store environment variables)
+#   2. Kubernetes Deployment (runs 3 replicas of the FastAPI application container)
+#   3. Kubernetes Service (exposes port 8000 and routes traffic to the Pods)
+#
+# Best Practices implemented:
+#   - Resource requests and limits for container runtime stability.
+#   - Liveness and readiness probes using the application's root health endpoint.
+#   - Use of stringData in Secret for readable configuration before Kubernetes base64-encodes them.
+#   - Explicit label selection and matching.
+#
+# To apply this manifest to your cluster:
+#   kubectl apply -f k8s-manifest.yaml
+# ==============================================================================
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: rag-app-secret
+  labels:
+    app: rag-app
+type: Opaque
+# 'stringData' allows you to write the secret values in plain text.
+# Kubernetes will automatically base64-encode them when creating the Secret resource.
+stringData:
+  OPENAI_API_KEY: "YOUR_OPENAI_KEY"
+  LANGFUSE_HOST: "YOUR_LANGFUSE_HOST"
+  LANGFUSE_SECRET_KEY: "YOUR_SECRET_KEY"
+  LANGFUSE_PUBLIC_KEY: "YOUR_PUBLIC_KEY"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rag-app-deployment
+  labels:
+    app: rag-app
+spec:
+  # Ensure 3 redundant replicas run for high availability
+  replicas: 3
+  # Selector defines how the Deployment finds the Pods it manages
+  selector:
+    matchLabels:
+      app: rag-app
+  # Template specifies the Pod layout
+  template:
+    metadata:
+      labels:
+        app: rag-app
+    spec:
+      containers:
+        - name: rag-app-container
+          # Docker image name specified for the application
+          image: rag-project:latest
+          # Ensure Kubernetes pulls the image correctly if built locally
+          imagePullPolicy: IfNotPresent
+          # The port the FastAPI app listens on inside the container
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          # Load all environment variables from the Secret resource defined above
+          envFrom:
+            - secretRef:
+                name: rag-app-secret
+          # Define resource requests and limits to guarantee scheduling slot and prevent OOM kills
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "1000m"
+          # Liveness probe checks if the container is running. If it fails, Kubernetes restarts it.
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          # Readiness probe checks if the container is ready to handle traffic.
+          # If it fails, the Pod is temporarily removed from the Service load balancer.
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rag-app-service
+  labels:
+    app: rag-app
+spec:
+  # Load balance traffic across all Pods matching this label selector
+  selector:
+    app: rag-app
+  ports:
+    - name: http
+      port: 8000          # The port the Service exposes cluster-internally
+      targetPort: 8000    # The port the application container is listening on
+      protocol: TCP
+  # ClusterIP makes the service accessible only within the Kubernetes cluster.
+  # If you want to expose it externally, change type to NodePort or LoadBalancer.
+  type: ClusterIP

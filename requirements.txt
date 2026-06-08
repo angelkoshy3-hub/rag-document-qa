@@ -6,6 +6,7 @@ annotated-types==0.7.0
 anyio==4.13.0
 async-timeout==4.0.3
 attrs==26.1.0
+backoff==2.2.1
 bcrypt==5.0.0
 build==1.4.2
 certifi==2026.2.25
@@ -43,11 +44,13 @@ jsonpointer==3.1.1
 jsonschema==4.26.0
 jsonschema-specifications==2025.9.1
 kubernetes==35.0.0
+langchain-chroma==1.1.0
 langchain-classic==1.0.3
 langchain-community==0.4.1
 langchain-core==1.2.24
 langchain-openai==1.1.12
 langchain-text-splitters==1.1.1
+langfuse==4.7.1
 langsmith==0.7.24
 markdown-it-py==4.0.0
 MarkupSafe==3.0.3
@@ -64,6 +67,7 @@ openai==2.30.0
 opentelemetry-api==1.40.0
 opentelemetry-exporter-otlp-proto-common==1.40.0
 opentelemetry-exporter-otlp-proto-grpc==1.40.0
+opentelemetry-exporter-otlp-proto-http==1.40.0
 opentelemetry-proto==1.40.0
 opentelemetry-sdk==1.40.0
 opentelemetry-semantic-conventions==0.61b0
@@ -113,6 +117,7 @@ uvloop==0.22.1
 watchfiles==1.1.1
 websocket-client==1.9.0
 websockets==16.0
+wrapt==1.17.3
 xxhash==3.6.0
 yarl==1.23.0
 zipp==3.23.0
